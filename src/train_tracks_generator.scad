@@ -104,6 +104,10 @@ track_nest_neck_width = ikea_track_nest_neck_width;
 track_nest_neck_length = ikea_track_nest_neck_length;
 track_nest_txt = ikea_track_nest_txt;
 
+// Emboss angle text on bridge parts
+emboss_bridge_angle = true;
+emboss_bridge_angle_depth_under = 0.2;
+emboss_bridge_angle_depth_side = 0.4;
 
 // ### TESTING / GENERATION AREA / EXAMPLES
 // ### Below I have provided many examples of how to call a generator module.
@@ -968,7 +972,8 @@ module generate_bridge(what_to_generate = 0,
                        slope_radius = 100,
                        straight_part_l = 205,
                        cutout = true, 
-                       pillar_l = 50) {
+                       pillar_l = 50,
+                       emboss_angle = emboss_bridge_angle) {
                            
     // Computing all horizontal and vertical offsets
     y_off_bg = sin(bridge_angle)*slope_radius + cos(bridge_angle)*slope_straight_plug_length;
@@ -979,7 +984,8 @@ module generate_bridge(what_to_generate = 0,
     if (what_to_generate == 0 || what_to_generate == 1)
         track_bridge_ground(radius = slope_radius,
                             angle = bridge_angle,
-                            cutout = cutout);
+                            cutout = cutout,
+                            emboss_angle = emboss_angle);
     
     if (what_to_generate == 0)
         color("LawnGreen")
@@ -1029,7 +1035,7 @@ module generate_bridge(what_to_generate = 0,
 //      -- true - the module will try to make a cutout
 //      -- false - cutouts disabled
 
-module track_bridge_ground(radius = 200, angle = 20, cutout = true) {
+module track_bridge_ground(radius = 200, angle = 20, cutout = true, emboss_angle = false) {
 
     sl_h = radius - (cos(angle) * radius);
     sl_dis = sin(angle) * radius;
@@ -1094,6 +1100,11 @@ module track_bridge_ground(radius = 200, angle = 20, cutout = true) {
     
     // New Pillar, easier to print
     rotate([0, 90, 0]) {
+
+        chamfer_width = track_chamfer * cos(45);
+        plug_length_to_chamfer = slope_straight_plug_length + track_plug_neck_length + track_plug_radius - track_chamfer/2;
+        
+        difference() {
         translate([0, 0, 0]) {
             step = 360 / $fn * 2;
 
@@ -1101,8 +1112,6 @@ module track_bridge_ground(radius = 200, angle = 20, cutout = true) {
                 for(a = [0:step:angle]) [radius * cos(a) - radius, radius * sin(a)]
             ];
             
-            chamfer_width = track_chamfer * cos(45);
-            plug_length_to_chamfer = slope_straight_plug_length + track_plug_neck_length + track_plug_radius - track_chamfer/2;
 
             translate([0,0,chamfer_width])
                 linear_extrude(track_width - chamfer_width * 2)
@@ -1116,6 +1125,16 @@ module track_bridge_ground(radius = 200, angle = 20, cutout = true) {
                             radius * sin(angle) + ((plug_length_to_chamfer) * cos(angle))
                         ]
                     ]));
+            };
+            if (emboss_angle) {
+                angle_text_size = 12;
+                rotate([90,180,90])
+                    translate([-plug_length_to_chamfer - radius * sin(angle) + track_chamfer + 10, -track_width/2 - angle_text_size/2, -emboss_bridge_angle_depth_under])
+                        linear_extrude(emboss_bridge_angle_depth_under)
+                            text(str(angle, "°"),
+                                font = "Courier New:style=Bold",
+                                size = angle_text_size);
+            }
         }
     }
     
