@@ -1070,12 +1070,12 @@ module track_bridge_ground(radius = 200, angle = 20, cutout = true) {
                                   grooves = true,
                                   both_sides = false);
                     
-                        
-                       translate([0, -slope_straight_plug_length, track_width-track_chamfer]) 
-                            rotate([0, 90, 0])
-                                cube([track_width - 2 * track_chamfer,
-                                      slope_straight_plug_length + track_plug_neck_length - track_plug_radius,
-                                      2.5]);
+                    // New Pillar doesn't need that
+                    //    translate([0, -slope_straight_plug_length, track_width-track_chamfer]) 
+                    //         rotate([0, 90, 0])
+                    //             cube([track_width - 2 * track_chamfer,
+                    //                   slope_straight_plug_length + track_plug_neck_length,
+                    //                   2.5]);
                     }
                 }
         } //union
@@ -1092,11 +1092,37 @@ module track_bridge_ground(radius = 200, angle = 20, cutout = true) {
         } //if (cutout)
     } //difference
     
+    // New Pillar, easier to print
+    rotate([0, 90, 0]) {
+        translate([0, 0, 0]) {
+            step = 360 / $fn * 2;
+
+            points = [
+                for(a = [0:step:angle]) [radius * cos(a) - radius, radius * sin(a)]
+            ];
+            
+            chamfer_width = track_chamfer * cos(45);
+            plug_length_to_chamfer = slope_straight_plug_length + track_plug_neck_length + track_plug_radius - track_chamfer/2;
+
+            translate([0,0,chamfer_width])
+                linear_extrude(track_width - chamfer_width * 2)
+                    polygon(concat([[0, tr_co_w]], points, [
+                        [
+                            radius * cos(angle) - radius - ((plug_length_to_chamfer) * sin(angle)),
+                            radius * sin(angle) + ((plug_length_to_chamfer) * cos(angle))
+                        ],
+                        [
+                            0,
+                            radius * sin(angle) + ((plug_length_to_chamfer) * cos(angle))
+                        ]
+                    ]));
+        }
+    }
     
     // Pillar
-    translate([track_chamfer, sl_dis-slope_straight_plug_length/2, 0]) {
-        cube([track_width - 2*track_chamfer, bridge_pillar_depth, sl_h]);
-    }
+    // translate([track_chamfer, sl_dis-slope_straight_plug_length/2, 0]) {
+        // cube([track_width - 2*track_chamfer, bridge_pillar_depth, sl_h]);
+    // }
 }
 
 // BRIDGE UPPER SLOPE PART - called by generate_bridge()
