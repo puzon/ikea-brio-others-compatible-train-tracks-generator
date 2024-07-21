@@ -1000,7 +1000,8 @@ module generate_bridge(what_to_generate = 0,
                 track_bridge_slope(radius = slope_radius,
                                    angle = bridge_angle,
                                    cutout = cutout,
-                                   slope_part_length = straight_part_l);    
+                                   slope_part_length = straight_part_l,
+                                   emboss_angle = emboss_angle);    
     
     if (what_to_generate == 0 || what_to_generate == 3)
         translate([0, y_off_bg + y_off_straight + y_off_sl + 100, 0])
@@ -1157,7 +1158,7 @@ module track_bridge_ground(radius = 200, angle = 20, cutout = true, emboss_angle
 //    bridge ground and upper parts, this is needed in order to
 //    calculate overall bridge height and to present an overview
 
-module track_bridge_slope(radius = 200, angle = 20, cutout = true, slope_part_length = 146) {
+module track_bridge_slope(radius = 200, angle = 20, cutout = true, slope_part_length = 146, emboss_angle = false) {
 
     sl_h = radius - (cos(angle) * radius);
     sl_dis = sin(angle) * radius;
@@ -1180,21 +1181,23 @@ module track_bridge_slope(radius = 200, angle = 20, cutout = true, slope_part_le
                     // High ending (nest)    
                     translate([radius, 0, track_width])
                         rotate([-90, 0, -90])
-                            track(slope_straight_nest_length,
+                            track(slope_straight_plug_length,
                                   cutout = false,
                                   end1 = "none",
-                                  end2 = "nest",
+                                  end2 = "plug",
                                   part_chamfers = true,
                                   end1_chamfers = false,
                                   end2_chamfers = true,
                                   grooves = true,
                                   both_sides = false);
                     
-                    translate([radius, -slope_straight_nest_length-track_nest_neck_length, track_chamfer]) 
-                            rotate([0, -90, 0])
-                                cube([track_width - 2 * track_chamfer,
-                                      slope_straight_nest_length + track_nest_neck_length,
-                                      2.5]);  
+                    // High ending support
+                    
+                    // translate([radius, -slope_straight_plug_length-track_nest_neck_length, track_chamfer]) 
+                    //         rotate([0, -90, 0])
+                    //             cube([track_width - 2 * track_chamfer,
+                    //                   slope_straight_plug_length + track_nest_neck_length,
+                    //                   2.5]);  
                     
                     // Low ending (nest)    
                     rotate([0, 0, angle])
@@ -1209,13 +1212,97 @@ module track_bridge_slope(radius = 200, angle = 20, cutout = true, slope_part_le
                                   end2_chamfers = false,
                                   grooves = true,
                                   both_sides = false);                            
-                            translate([-2.5, -slope_straight_nest_length, -track_chamfer]) 
-                                rotate([0, 90, 0])
-                                    cube([track_width - 2 * track_chamfer,
-                                          slope_straight_nest_length + track_nest_neck_length,
-                                          2.5]);
+                            // translate([-2.5, -slope_straight_nest_length, -track_chamfer]) 
+                            //     rotate([0, 90, 0])
+                            //         cube([track_width - 2 * track_chamfer,
+                            //               slope_straight_nest_length + track_nest_neck_length,
+                            //               2.5]);
                         }
                     }
+                    
+                    rotate([0, -90, 0]) {
+                        chamfer_width = track_chamfer * cos(45);
+                        pillar_thickness = track_width - chamfer_width * 2;
+                        plug_length_to_chamfer = slope_straight_nest_length + 5;
+                        difference() {
+                            translate([0, 0, 0]) {
+                                lower_support_length = track_nest_neck_length + slope_straight_nest_length;
+                                step = 360 / $fn * 1;
+
+                                points = [
+                                    for(a = [0:step:angle]) [radius * cos(a) - radius, radius * sin(a)]
+                                ];
+                                
+
+                                // TODO: Calculate slope position to achieve 45 deg slope
+                                higher_pillar_under_slope_y = -20;
+                                lower_pillar_under_slope_y = -30;
+
+                                translate([0,0, -track_width + chamfer_width])
+                                    linear_extrude(pillar_thickness)
+                                        polygon(concat(
+                                            [
+                                                [-(2 * sl_h + sl_str_h), -slope_straight_plug_length],
+                                                [higher_pillar_under_slope_y, -slope_straight_plug_length],
+
+
+                                                [-2, -slope_straight_plug_length - track_plug_neck_length - track_plug_radius + track_chamfer/2],
+                                                [0, -slope_straight_plug_length - track_plug_neck_length - track_plug_radius + track_chamfer/2],
+                                            ],
+                                            points,
+                                            [
+                                                [
+                                                    radius * cos(angle) - radius - ((plug_length_to_chamfer) * sin(angle)),
+                                                    radius * sin(angle) + ((plug_length_to_chamfer) * cos(angle))
+                                                ],
+                                                [
+                                                    radius * cos(angle) - radius - ((plug_length_to_chamfer) * sin(angle)) - 2,
+                                                    radius * sin(angle) + ((plug_length_to_chamfer) * cos(angle))
+                                                ],
+                                                [
+                                                    radius * cos(angle) - radius + lower_pillar_under_slope_y,
+                                                    radius * sin(angle) + ((0) * cos(angle))
+                                                ],
+                                                [
+                                                    -(2 * sl_h + sl_str_h),
+                                                    radius * sin(angle) + ((0) * cos(angle))
+                                                ]
+                                            ]
+                                        ));
+                            };
+
+                            translate([-(2 * sl_h + sl_str_h),0,-pillar_thickness - chamfer_width])
+                                union() {
+                                    pillar_tunnel = radius * sin(angle) - bridge_pillar_depth;
+                                    cube([sl_str_h - bridge_pillar_depth,pillar_tunnel,pillar_thickness+1]);
+                                    translate([sl_str_h - bridge_pillar_depth,pillar_tunnel/2,0])
+                                        cylinder(r=pillar_tunnel/2, h=pillar_thickness+1, center=false);
+                                };
+                            
+                            if (emboss_angle) {
+                                angle_text_size = 12;
+                                rotate([90,90,0])
+                                translate([5,-40,bridge_pillar_depth - emboss_bridge_angle_depth_side])
+                                    // translate([-plug_length_to_chamfer - radius * sin(angle) + track_chamfer + 10, -track_width/2 - angle_text_size/2, -emboss_bridge_angle_depth])
+                                        linear_extrude(emboss_bridge_angle_depth_side)
+                                            text(str(angle, "°"),
+                                                font = "Courier New:style=Bold",
+                                                size = angle_text_size);
+                            }
+                        }
+                    }
+
+                           
+                    // translate([0, slope_straight_nest_length, 0]) {
+                    // rotate([-90, 0, -90]) {
+                    //     lower_support_length = track_nest_neck_length + slope_straight_nest_length;
+                    //     polygon([
+                    //         [0, 0],
+                    //         [0, 20],
+                    //         [-20,20],
+                    //         [-20,0],
+                    //     ]);}
+                    // }
             } //union
             
             if (cutout) {
@@ -1231,17 +1318,17 @@ module track_bridge_slope(radius = 200, angle = 20, cutout = true, slope_part_le
         } //difference
    
     // Higher pillar
-    translate([track_chamfer, -slope_straight_nest_length, 0]) {
-        cube([track_width - 2*track_chamfer, bridge_pillar_depth, 2 * sl_h + sl_str_h]);
-    }
+    // translate([track_chamfer, -slope_straight_plug_length, 0]) {
+    //     cube([track_width - 2*track_chamfer, bridge_pillar_depth, 2 * sl_h + sl_str_h]);
+    // }
     
     // Lower pillar
-    translate([track_chamfer, sl_dis-bridge_pillar_depth, 0]) {
-        cube([track_width - 2*track_chamfer, bridge_pillar_depth, sl_h + sl_str_h+sl_pilr_corr_h]);
-    }
+    // translate([track_chamfer, sl_dis-bridge_pillar_depth, 0]) {
+    //     cube([track_width - 2*track_chamfer, bridge_pillar_depth, sl_h + sl_str_h+sl_pilr_corr_h]);
+    // }
     // Pillars connecting bar
-    translate([track_chamfer, -slope_straight_nest_length, 0])
-        cube([track_width - 2*track_chamfer, sl_dis+slope_straight_nest_length, 3]);
+    // translate([track_chamfer, -slope_straight_nest_length, 0])
+    //     cube([track_width - 2*track_chamfer, sl_dis+slope_straight_nest_length, 3]);
     /*
     // Bridge height
     echo("Bridge height (distance between ground and bottom layer of the top bridge track): ", str(2 * sl_h + sl_str_h));
