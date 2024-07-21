@@ -1009,7 +1009,8 @@ module generate_bridge(what_to_generate = 0,
                                   radius = slope_radius,
                                   angle = bridge_angle,
                                   cutout = cutout,
-                                  slope_part_length = straight_part_l);
+                                  slope_part_length = straight_part_l,
+                                  emboss_angle = emboss_angle);
 
     // Bridge height
     sl_h = slope_radius - (cos(bridge_angle) * slope_radius);
@@ -1244,8 +1245,6 @@ module track_bridge_slope(radius = 200, angle = 20, cutout = true, slope_part_le
                                             [
                                                 [-(2 * sl_h + sl_str_h), -slope_straight_plug_length],
                                                 [higher_pillar_under_slope_y, -slope_straight_plug_length],
-
-
                                                 [-2, -slope_straight_plug_length - track_plug_neck_length - track_plug_radius + track_chamfer/2],
                                                 [0, -slope_straight_plug_length - track_plug_neck_length - track_plug_radius + track_chamfer/2],
                                             ],
@@ -1349,7 +1348,7 @@ module track_bridge_slope(radius = 200, angle = 20, cutout = true, slope_part_le
 //    bridge ground and upper parts, this is needed in order to
 //    calculate overall bridge height and to present an overview
 
-module track_bridge_straight(length = 50, radius = 200, angle = 20, cutout = true, slope_part_length = 146) {
+module track_bridge_straight(length = 50, radius = 200, angle = 20, cutout = true, slope_part_length = 146, emboss_angle = false) {
 
     sl_h = radius - (cos(angle) * radius);
     sl_dis = sin(angle) * radius;
@@ -1365,36 +1364,68 @@ module track_bridge_straight(length = 50, radius = 200, angle = 20, cutout = tru
                     // Straight track part
                     track(length = length, cutout = cutout);
                    
-                    // Nest side    
-                    translate([track_nest_radius + track_plug_neck_length + track_chamfer, track_chamfer, -2.5]) 
-                        rotate([0, 0, 90])
-                            cube([track_width - 2 * track_chamfer,
-                                  2* track_nest_radius +                              track_nest_neck_length +
-                                  track_chamfer,
-                                  2.5]);  
-                    
-                    // Plug side    
-                    translate([length + track_plug_neck_length-track_plug_radius, track_chamfer, -2.5]) 
-                                rotate([0, 0, 90])
-                                cube([track_width - 2 * track_chamfer,
-                                      bridge_pillar_depth +
-                                      track_plug_neck_length -
-                                      track_plug_radius,
-                                      2.5]); 
+                    rotate([-90, -90, 0]) {
+                        chamfer_width = track_chamfer * cos(45);
+                        pillar_thickness = track_width - chamfer_width * 2;
+                        plug_length_to_chamfer = track_plug_neck_length + track_plug_radius - track_chamfer/2;
+
+                        // TODO: Calculate slope position to achieve 45 deg slope
+                        slope_width = 10;
+                        difference() {
+                            translate([0, 0, 0]) {
+                                lower_support_length = track_nest_neck_length + slope_straight_nest_length;
+                                step = 360 / $fn * 1;
+
+
+                                translate([0,0, chamfer_width])
+                                    linear_extrude(pillar_thickness)
+                                        polygon([
+                                            [-(2 * sl_h + sl_str_h), slope_width],
+                                            [-slope_width - 2, slope_width],
+                                            [-2 , -2],
+                                            [0 , -2],
+                                            [0 , length + plug_length_to_chamfer],
+                                            [-2 , length + plug_length_to_chamfer],
+                                            [-slope_width -2, length + plug_length_to_chamfer - slope_width],
+                                            [-(2 * sl_h + sl_str_h) , length + plug_length_to_chamfer - slope_width],
+                                        ]);
+                            };
+
+                            translate([-(2 * sl_h + sl_str_h), slope_width + bridge_pillar_depth, chamfer_width - 1])
+                                union() {
+                                    pillar_tunnel = length + plug_length_to_chamfer - slope_width * 2 - bridge_pillar_depth * 2;
+                                    cube([sl_str_h - bridge_pillar_depth,pillar_tunnel,pillar_thickness+2]);
+                                    translate([sl_str_h - bridge_pillar_depth,pillar_tunnel/2,0])
+                                        cylinder(r=pillar_tunnel/2, h=pillar_thickness+2, center=false);
+                                };
+                            
+                            
+                            
+                            if (emboss_angle) {
+                                angle_text_size = 12;
+                                rotate([90,90,0])
+                                translate([-track_width + 3,-slope_width - track_height - 2 - 3,-slope_width - emboss_bridge_angle_depth_side])
+                                    // translate([-plug_length_to_chamfer - radius * sin(angle) + track_chamfer + 10, -track_width/2 - angle_text_size/2, -emboss_bridge_angle_depth])
+                                        linear_extrude(emboss_bridge_angle_depth_side)
+                                            text(str(angle, "°"),
+                                                font = "Courier New:style=Bold",
+                                                size = angle_text_size);
+                            }
+                        }
                     }
-   
-    // First pillar
-    translate([track_chamfer, -track_nest_radius, 0]) {
-        cube([track_width - 2*track_chamfer, bridge_pillar_depth, 2 * sl_h + sl_str_h]);
     }
+    // // First pillar
+    // translate([track_chamfer, -track_nest_radius, 0]) {
+    //     cube([track_width - 2*track_chamfer, bridge_pillar_depth, 2 * sl_h + sl_str_h]);
+    // }
     
-    // Second pillar
-    translate([track_chamfer, length - bridge_pillar_depth, 0]) {
-        cube([track_width - 2*track_chamfer, bridge_pillar_depth, 2 * sl_h + sl_str_h]);
-    }
-    // Pillars connecting bar
-    translate([track_chamfer, -track_nest_radius, 0])
-        cube([track_width - 2*track_chamfer, length + track_nest_radius, 3]);
+    // // Second pillar
+    // translate([track_chamfer, length - bridge_pillar_depth, 0]) {
+    //     cube([track_width - 2*track_chamfer, bridge_pillar_depth, 2 * sl_h + sl_str_h]);
+    // }
+    // // Pillars connecting bar
+    // translate([track_chamfer, -track_nest_radius, 0])
+    //     cube([track_width - 2*track_chamfer, length + track_nest_radius, 3]);
 }
 
 // ### DOG-BONE GENERATOR MODULE
